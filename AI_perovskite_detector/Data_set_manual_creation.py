@@ -214,6 +214,6 @@ class CornerDetector:
 
 if __name__ == '__main__':
     start_time = time.time()
-    path_folder = pathlib.Path('path/to/your/folder')
+    path_folder = pathlib.Path("path/to/your/folder")
     corner_detector = CornerDetector(path_folder)
     print("\n", "--- %s seconds ---" % (time.time() - start_time))

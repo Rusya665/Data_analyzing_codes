@@ -383,6 +383,7 @@ class PerovskiteTester:
     def show_image_with_corners(self) -> None:
         """
         Displays the selected image with the detected corners drawn on it.
+        :return: None
         """
         # Use the stored image_path instead of passing it as an argument
         image = Image.open(self.image_path).convert("RGB")

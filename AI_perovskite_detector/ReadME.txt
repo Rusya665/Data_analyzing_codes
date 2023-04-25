@@ -19,7 +19,7 @@ This repository contains code to train and evaluate a convolutional neural netwo
 ## Installation
 
 1. Clone the repository:
-git clone https://github.com/yourusername/Perovskite-Crystal-Corner-Detection.git
+git clone https://github.com/Rusya665/Perovskite-Crystal-Corner-Detection.git
 
 2. Install the required packages:
 pip install -r requirements.txt
