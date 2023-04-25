@@ -1,10 +1,14 @@
 # RGB channels extraction and images background erasing
 
 This folder contains codes to work with images and IV data of solar cells.
-`Deleting&filming.py` <- proceeds all images in given folder and deletes background using rembg package. Also, tries to make a video. Use for degradation analysis of photovoltaic devices.
-`Main chart plotting (total, IV).py` <- Plot the obtained by `RGB_select_areas.py` RGB values in Microsoft Excel.
-`RGB_select_areas.py` <- Allow user to draw 3 rectangular area for subsequent extraction RGB values and saves the drawing.
-`Select_images_extract_RGB.py` <- GUI based folders with images selector for further `RGB_select_areas.py` usage.
+
+| File name                            | Description                                                                                                                                                             |
+|--------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Deleting&filming.py `               | Processes all images in a given folder and deletes background using `rembg` package. Also, tries to make a video. Use for degradation analysis of photovoltaic devices. |
+| `Main chart plotting (total, IV).py` | Plots the RGB values obtained by `RGB_select_areas.py` in Microsoft Excel.                                                                                              |
+| `RGB_select_areas.py `               | Allows the user to draw 3 rectangular areas for subsequent extraction of RGB values and saves the drawing.                                                              |
+| `Select_images_extract_RGB.py `      | GUI-based folder with images selector for further `RGB_select_areas.py` usage.                                                                                          |
+
 
 ## Table of Contents
 - [Usage](#usage)
