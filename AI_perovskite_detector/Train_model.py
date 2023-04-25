@@ -395,15 +395,10 @@ class PerovskiteTester:
 
 if __name__ == "__main__":
     start_time = time.time()
-    image_folder1 = r"C:\Users\runiza.TY2206042\OneDrive - O365 Turun yliopisto\Desktop\Dataset\Input"
-    excel_file1 = r"C:\Users\runiza.TY2206042\OneDrive - O365 Turun yliopisto\Desktop\Dataset/Excel\2022-07-21 " \
-                  r"10.49.06 Results_AI.xlsx"
-    model_folder1 = r'C:\Users\runiza.TY2206042\OneDrive - O365 Turun yliopisto\Desktop\Dataset\Model'
+    image_folder1 = "path/to/your/folder"
+    excel_file1 = "path/to/your/folder"
+    model_folder1 = "path/to/your/folder"
     trainer = PerovskiteTrainer(image_folder1, excel_file1, model_folder1, batch_size=4, num_epochs=2,
                                 learning_rate=0.01)
     trainer.run()
-
-    # tester_input = PerovskiteTester(None)
-    # gui = PerovskiteGUI(tester_input)
-
     print("\n", "--- %s seconds ---" % (time.time() - start_time))
