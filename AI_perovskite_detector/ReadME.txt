@@ -3,27 +3,9 @@
 This repository contains code to train and evaluate a convolutional neural network (CNN) for detecting the corners of perovskite crystals in images. Perovskite materials are used in solar cells, and their unique crystal structure allows them to efficiently absorb sunlight and convert it into electricity. Analyzing the crystal structure is important for understanding the performance of the solar cells.
 
 ## Table of Contents
-- [Requirements](#requirements)
-- [Installation](#installation)
 - [Usage](#usage)
 - [Contributing](#contributing)
 - [License](#license)
-
-## Requirements
-
-- Python 3.x
-- TensorFlow 2.x
-- OpenCV
-- NumPy
-
-## Installation
-
-1. Clone the repository:
-git clone https://github.com/Rusya665/Perovskite-Crystal-Corner-Detection.git
-
-2. Install the required packages:
-pip install -r requirements.txt
-
 
 ## Usage
 
