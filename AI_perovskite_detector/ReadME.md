@@ -1,6 +1,6 @@
 # Perovskite Crystal Corner Detection
 
-This repository contains code to train and evaluate a convolutional neural network (CNN) for detecting the corners of perovskite crystals in images. Perovskite materials are used in solar cells, and their unique crystal structure allows them to efficiently absorb sunlight and convert it into electricity. Analyzing the crystal structure is important for understanding the performance of the solar cells.
+This folder contains codes to train and evaluate a convolutional neural network (CNN) for detecting the corners of perovskite crystals in images. Perovskite materials are used in solar cells, and their unique crystal structure allows them to efficiently absorb sunlight and convert it into electricity. Analyzing the crystal structure is important for understanding the performance of the solar cells.
 
 ## Table of Contents
 - [Usage](#usage)
