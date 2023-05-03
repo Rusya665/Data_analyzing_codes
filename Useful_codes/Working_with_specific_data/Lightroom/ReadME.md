@@ -1,17 +1,19 @@
-# Image renaming
+# Working with images
 
-This folder contains two Python scripts for changing the names of raw image files in a specific format. The main rule for the file names is that each raw image file name is supposed to be in the format 'yyyy-mm-dd(-n)_name.arw', where:
+This folder contains Python scripts for changing the names of raw image files in a specific format. The main rule for the file names is that each raw image file name is supposed to be in the format 'yyyy-mm-dd(-n)_name.arw', where:
 
 1. yyyy-mm-dd has to correspond to the folder name, i.e., the folder name (date) must be the same as the picture DateTime from the EXIF. If not, a warning message will appear.
 2. (-n) is the specific format which appears only if the folder already contains some properly named files, in other words, preventing name overlapping and allowing multiple photo-sessions per day for the same samples.
 
+Also, the `Lightroom_smart_collections_creator.py` can help with auto-creation of the smart collections for the Adobe LightroomClassic. 
 ## Table of Contents
-- [File Name Changing Script](#file-name-changing-script)
+- [Working with images](#working-with-images)
   - [Table of Contents](#table-of-contents)
   - [Usage](#usage)
     - [Requirements](#requirements)
     - [Changing File Names](#changing-file-names)
     - [Undoing File Name Changes](#undoing-file-name-changes)
+    - [Smart collections creator](#smart-collection-creator)
   - [Contributing](#contributing)
   - [License](#license)
 
@@ -41,6 +43,19 @@ To use the `Undo_file_renaming.py` script for undoing file name changes, follow 
 2. Edit the `Undo_for_folder` variable to the folder name for which you want to undo the file name changes.
 3. Run the script.
 4. The script will go through the log file for the specified folder and undo the file name changes.
+
+### Smart collection creator
+
+TO use the `Lightroom_smart_collections_creator.py` script for creating smart collections, follow these steps:
+
+
+  1. Set the `output_path` variable to the desired folder path where the Smart Collection files will be saved.
+  2. Set the `collection_value` variable to the desired collection value to be used in the Smart Collection criteria.
+  3. Set the `filename_values` list to the desired filename values to be used in the Smart Collection criteria.
+  4. Set the `side_flag` variable to `True` if you want to create two Smart Collections for each filename value 
+  (with ".0" and ".1" appended). Set it to False if you want to create only one Smart Collection for each filename
+  value without appending anything.
+
 
 ## Contributing
 

@@ -43,7 +43,7 @@ For usage, see the [Multiple Useful Codes README.md](Useful_codes/ReadMe.md).
 
 This folder contains two Python scripts for changing the names of raw image files in a specific format. The main rule for the file names is that each raw image file name is supposed to contain a certain string pattern. The script can be used to rename the files according to the user's needs.
 
-For usage, see the [Image Renaming README.md](Useful_codes/Working_with_specific_data/Images_renaming_Lightroom).
+For usage, see the [Image Renaming README.md](Useful_codes/Working_with_specific_data/Lightroom).
 
 ## PowerPoint Slide Generator and XLSX Data Plotter
 
