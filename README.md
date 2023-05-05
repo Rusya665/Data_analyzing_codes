@@ -2,17 +2,60 @@
 
 This repository contains various Python scripts and tools for working with raw image files, generating PowerPoint slides, plotting data from XLSX files, performing specific data analysis, training and evaluating a convolutional neural network (CNN) for detecting the corners of perovskite crystals in images, and more.
 
-## Table of Contents
-- [Perovskite Crystal Corner Detection](#perovskite-crystal-corner-detection)
-- [Rustem Nizamov's Code Repository](#rustem-nizamovs-code-repository)
-- [RGB Channels Extraction and Images Background Erasing](#rgb-channels-extraction-and-images-background-erasing)
-- [IV Data Processing and Analysis](#iv-data-processing-and-analysis)
-- [Multiple Useful Codes](#multiple-useful-codes)
-- [Image Renaming](#image-renaming)
-- [PowerPoint Slide Generator and XLSX Data Plotter](#powerpoint-slide-generator-and-xlsx-data-plotter)
-- [Tools for Specific Data Analysis](#tools-for-specific-data-analysis)
+# Table of Contents
+- [Repo's structure](#repos-structure)
+  - [Perovskite Crystal Corner Detection](#perovskite-crystal-corner-detection)
+  - [RGB Channels Extraction and Images Background Erasing](#rgb-channels-extraction-and-images-background-erasing)
+  - [IV Data Processing and Analysis](#iv-data-processing-and-analysis)
+  - [Multiple Useful Codes](#multiple-useful-codes)
+  - [Image Renaming](#image-renaming)
+  - [PowerPoint Slide Generator and XLSX Data Plotter](#powerpoint-slide-generator-and-xlsx-data-plotter)
+  - [Tools for Specific Data Analysis](#tools-for-specific-data-analysis)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Repo's structure
+```
+|-- AI_perovskite_detector
+|   +-- Data_set_manual_creation.py
+|   +-- ReadME.md
+|   +-- Train_model.py
+|-- RGB_extractor_&_bacground_removing
+|   +-- Deleting&filming.py
+|   +-- Main chart plotting (total, IV).py
+|   +-- RGB_select_areas.py
+|   +-- ReadMe.md
+|   +-- Select_images_extract_RGB.py
+|-- Solar_cells_measurements_plotting
+|   +-- ReadMe.md
+|   +-- instruments.py
+|   +-- log_creater.py
+|   +-- main.py
+|   +-- read_iv.py
+|   +-- xlsx_plotter.py
+|-- Useful_codes
+|   |-- Working_with_specific_data
+|   |   |-- IV_data_manipulation_SC
+|   |   |   +-- PlottingIVdata.py
+|   |   |   +-- PowerPoint_pictures_adding.py
+|   |   |   +-- ReadMe.md
+|   |   |-- Lightroom
+|   |   |   +-- Lightroom_naming_changing.py
+|   |   |   +-- Lightroom_naming_changing_undo.py
+|   |   |   +-- Lightroom_smart_collections_creator.py
+|   |   |   +-- ReadME.md
+|   |   +-- ReadMe.md
+|   |   +-- dta_simple_plot+converge.py
+|   |   +-- plot_FHI-aims.py
+|   +-- DAT_reading.py
+|   +-- QR_generator.py
+|   +-- ReadMe.md
+|   +-- Text_compare_to_a_list.py
++-- Instruments.py
++-- LICENSE
++-- README.md
+```
+
 
 ## Perovskite Crystal Corner Detection
 
