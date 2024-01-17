@@ -87,7 +87,7 @@ def main():
     """
     The main function that creates and saves Smart Collections based on the specified criteria.
     """
-    output_path = r"C:/Users/runiza.TY2206042/OneDrive - O365 Turun yliopisto/Desktop/Smart collections"
+    output_path = r""
 
     # Create the output folder if it doesn't exist
     if not os.path.exists(output_path):

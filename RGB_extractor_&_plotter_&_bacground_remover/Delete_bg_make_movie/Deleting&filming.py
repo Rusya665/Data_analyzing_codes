@@ -1,13 +1,12 @@
+import json
 import math
 import re
 import time
 from datetime import datetime
 from pathlib import Path
 
-# import cv2
 import numpy as np
 import pandas as pd
-from cv2 import cv2
 from imutils import perspective
 from tqdm import tqdm, trange
 
@@ -19,7 +18,7 @@ class RemoveBackgroundMakeFilm:
         if not parent_path.endswith('/'):
             parent_path = parent_path + '/'
         self.extension = '.jpg'
-        self.extension_out = '.png'  # Keep output extension as .png to apply alpha channel
+        self.extension_out = '.png'  # Keep the output extension as ".png" to apply the alpha channel
         self.frame_rate = frame_rate
         self.path = self.check_path(parent_path)
         self.folder = None
@@ -30,7 +29,6 @@ class RemoveBackgroundMakeFilm:
         pbar_main = tqdm(self.path, desc=f'Working in {os.path.basename(os.path.normpath(parent_path))}',
                          position=0, ncols=100, unit='directory', colour='#ffc25c')  # unit_scale=True)
         for folder in pbar_main:
-            # ic(folder)
             self.start_time = time.time()
             self.folder = folder + '/'
             self.path_out = self.folder + "Processed/"
@@ -75,7 +73,8 @@ class RemoveBackgroundMakeFilm:
                 try:
                     max_time_len = len(str(self.time_line.iat[-1, 0]))
                     final_image_name = (max_time_len - len(str(self.time_line.iat[i, 0]))) * ' ' \
-                                       + str(self.time_line.iat[i, 0])  # Add spaces from the left to align names
+                                       + str(i) + '-' + str(
+                        self.time_line.iat[i, 0])  # Add spaces from the left to align names
                     log.write(f"{i + 1}. {j} {self.img_shape(self.folder + j)}"
                               f"\t{final_image_name}{self.extension_out} {self.img_shape(self.cropped[i])}\n")
                 except AttributeError:
@@ -89,9 +88,14 @@ class RemoveBackgroundMakeFilm:
             log.write(f'Number of background erasing cycles: {self.cycles}\n')
             log.write(f'Did film was created: {self.film}\n')
             if self.film == 'y':
+                img_shape = self.img_shape(self.cropped[0])
                 log.write(f'Ageing video: {self.video_name}\n')
                 log.write(f'Frame rate: {self.frame_rate}\n')
-                log.write(f'Frame size: {self.img_shape(self.cropped[0])[0:2]}\n')
+                if img_shape is not None:
+                    frame_size = img_shape[0:2]
+                    log.write(f'Frame size: {frame_size}\n')
+                else:
+                    log.write('Frame size: Error reading image\n')
             log.write(f'\nImages processing time: \t{self.executed_time - self.start_time} sec'
                       f'\nTotal time: \t{time.time() - self.start_time} sec\n')
 
@@ -103,8 +107,12 @@ class RemoveBackgroundMakeFilm:
         if not img:
             img = self.cropped[0]
         img_hwc = cv2.imread(img)
-        height, width, channels = img_hwc.shape
-        return height, width, channels
+        if img_hwc is not None:
+            height, width, channels = img_hwc.shape
+            return height, width, channels
+        else:
+            print(f"Error reading image at {img}. Skipping this image.")
+            return None
 
     def create_video(self):
         """
@@ -112,18 +120,22 @@ class RemoveBackgroundMakeFilm:
         :return: None
         """
         # frame = cv2.imread(cropped)
-        height, width, _ = self.img_shape()
-        video = cv2.VideoWriter(self.path_out + self.video_name, 0, self.frame_rate, (width, height))
+        img_shape = self.img_shape()
+        if img_shape is not None:
+            height, width, _ = img_shape
+            video = cv2.VideoWriter(self.path_out + self.video_name, 0, self.frame_rate, (width, height))
 
-        for shoot in trange(len(self.cropped), desc='Filming', ncols=100, unit='img', colour='red', position=1,
-                            leave=None):
-            try:
-                img_1 = cv2.imread(self.cropped[shoot])
-                resized = cv2.resize(img_1, (width, height))
-                video.write(resized)
-            except cv2.error:
-                pass
-        video.release()
+            for shoot in trange(len(self.cropped), desc='Filming', ncols=100, unit='img', colour='red', position=1,
+                                leave=False):
+                try:
+                    img_1 = cv2.imread(self.cropped[shoot])
+                    resized = cv2.resize(img_1, (width, height))
+                    video.write(resized)
+                except cv2.error:
+                    pass
+            video.release()
+        else:
+            pass
 
     def crop_images(self):
         """
@@ -131,19 +143,20 @@ class RemoveBackgroundMakeFilm:
         :return: None
         """
         pbar2 = tqdm(range(len(self.samples)), desc='Cropping images and saving', unit=' image processing',
-                     ncols=100, colour='green', leave=None, position=1)
+                     ncols=100, colour='green', leave=False, position=1)
         for pic in pbar2:
             final_image = self.cropping_an_image(self.sizes_pd, self.center[pic], self.pre_processed[pic])
             # final_image = pre_processed[pic]
             if final_image is None:
                 raise ValueError('A very specific bad thing happened.')
-            out_img = create_folder(self.folder, "Processed") + str(self.time_line.iat[pic, 0]) + self.extension_out
+            out_img = create_folder(self.folder, "Processed") + str(pic) + '-' + str(
+                self.time_line.iat[pic, 0]) + self.extension_out
             self.cropped.append(out_img)
             try:
                 cv2.imwrite(out_img, final_image)
             except cv2.error:
-                print('cv2 error')
-                self.error_list.append(str(self.time_line.iat[pic, 0]) + self.extension_out)
+                print(f'cv2 error for {self.samples[pic]}')
+                self.error_list.append(str(pic) + '-' + str(self.time_line.iat[pic, 0]) + self.extension_out)
             pbar2.set_description(f'Cropping and saving image {pic + 1}')
 
     @staticmethod
@@ -180,7 +193,7 @@ class RemoveBackgroundMakeFilm:
         :return: None
         """
         pbar1 = tqdm(range(len(self.samples)), desc='Preprocessing images', unit=' image processing', ncols=100,
-                     colour='YELLOW', position=1, leave=None)
+                     colour='YELLOW', position=1, leave=False)
         for index in pbar1:
             image = self.no_background[index]
             processing = self.an_image_processing(image)[0]
@@ -209,7 +222,7 @@ class RemoveBackgroundMakeFilm:
         rect = cv2.minAreaRect(objects_contours[0])
         (x, y), _, _ = rect
         coord = cv2.boxPoints(rect)
-        coord = np.int0(coord)
+        coord = np.intp(coord)
         height, width = photo.shape[:2]
         box = self.pick_coordinates(coord)
         matrix = cv2.getRotationMatrix2D((int(x - 1), int(y - 1)), self.angle_between2(box[-1], box[0]), 1.0)
@@ -268,9 +281,9 @@ class RemoveBackgroundMakeFilm:
         :return: list with erased background pictures opened in cv2
         """
         for cycle in tqdm(range(self.cycles), desc='Erasing cycles', position=1, ncols=100, unit='img',
-                          colour='#FF7518', leave=None):
+                          colour='#FF7518', leave=False):
             for initial_photo in trange(len(self.samples), desc=f'Cycle {cycle + 1} erasing background', position=2,
-                                        ncols=100, unit='img', leave=None, colour='blue'):
+                                        ncols=100, unit='img', leave=False, colour='blue'):
                 if len(self.no_background) == len(self.samples):  # If cycles > 1
                     clear_img = delete_background(self.no_background[initial_photo])
                     self.no_background[initial_photo] = clear_img
@@ -287,30 +300,34 @@ class RemoveBackgroundMakeFilm:
         Detect a given Timeline
         :return: Pandas DataFrame with hours
         """
-        flag = '.xlsx'  # Here is the extension for timeline file
-        time_line_directory = str(os.path.dirname(os.path.dirname(self.path[0] + '/'))) + '/'
-        if time_line_directory.endswith('Perovskite/'):
-            name_k = int(self.sample_name.split('-')[0])
-            if name_k == 5 or name_k == 6 or name_k == 11:  # Specified timeline for specific case (Perovskite case)
-                flag = '1.xlsx'
-                print('Specific Timeline file has been used')
-        timeline = Path(time_line_directory + 'Timeline' + flag)  # Specify here the file with timepoints
-        if timeline.is_file():
-            df = pd.read_excel(timeline, header=None, na_values=["NA"])
-            if len(df.index) < len(self.samples):
-                raise ValueError(f'Check the {timeline}. It seems like not enough timepoints are given')
-            return np.ceil(df).astype(int)
-        else:
-            raise ValueError(f'Check the {timeline}')
+        timeline_path = Path(self.path[0]).parent / 'Timeline.json'
+
+        if not timeline_path.is_file():
+            raise ValueError(f'Check the {timeline_path}')
+
+        with timeline_path.open('r') as f:
+            time_data = json.load(f)
+
+        df = pd.DataFrame(time_data)
+
+        if len(df) < len(self.samples):
+            raise ValueError(f'Not enough timepoints in {timeline_path}')
+
+        return df.round().astype(int)
 
     def file_sorting(self):
         """
-        If the images are not starting with the yyyy-mm-dd format, i.e. they are not renamed with the
-        Lightroom_naming_changing, apply manual sorting. Cases like [1, 2, 10, 20] are taken into account
+        Sorts the list of sample images based on their filenames.
+        If the filenames do not start with a date in the format 'yyyy-mm-dd' or 'yyyymmdd', a manual sorting is applied.
+        The manual sorting takes into account numerical substrings in filenames for ordering
+        (e.g., [1, 2, 10, 20] will be sorted correctly).
+
         :return: None
         """
         img_name = self.samples[0].split('_')[0]
-        if not is_date(img_name, True):
+        date_pattern = re.compile(r"\d{4}-?\d{2}-?\d{2}")  # Matches yyyy-mm-dd or yyyymmdd
+
+        if not date_pattern.match(img_name):
             print(self.samples[0])
             print('Non-date case detected. ReSorting applied')
             self.samples.sort(key=lambda f: int(re.sub("\D", '', f)))
@@ -321,12 +338,23 @@ class RemoveBackgroundMakeFilm:
         :param path: the path to a folder
         :return: list with folder(s) containing pictures with the specified extension
         """
+        # target_folders = [
+        #     "77_0", "78_0", "79_0", "79_1", "80_0", "80_1", "82_0", "83_0", "85_0", "85_1",
+        #     "86_0", "87_0", "90_0", "91_1", "132_0", "138_1", "141_0", "157_1"
+        # ]
+        # target_folders = ['R3_0']
+        target_folders = []
         folders = []
         for dir_path, dir_names, files in os.walk(path):
             for file in files:
                 if file.endswith(self.extension):
-                    if dir_path not in folders:
-                        folders.append(dir_path)
+                    if target_folders:
+                        if dir_path not in folders and os.path.basename(dir_path) in target_folders:
+                            folders.append(dir_path)
+                    else:
+                        if dir_path not in folders:
+                            folders.append(dir_path)
+
         if folders:
             if path in folders:
                 folders.remove(path)

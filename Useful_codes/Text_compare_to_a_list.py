@@ -1,8 +1,8 @@
 import re
 
 
-path_text = r'C:\Users\runiza\OneDrive - O365 Turun yliopisto\Desktop/Text.txt'
-path_AWL = r'C:\Users\runiza\OneDrive - O365 Turun yliopisto\Desktop/AWL.txt'
+path_text = ''
+path_AWL = ''
 
 forbidden_list = ['so', 'non']
 AWL_list = []
