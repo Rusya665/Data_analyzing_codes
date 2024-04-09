@@ -30,6 +30,50 @@ def create_folder(path: str, new_folder: str, side=''):  # Creating new folder f
         return str(path + new_folder + side + '/')
 
 
+def is_date(string, fuzzy=True):
+    ##############################################################
+    # https://stackoverflow.com/a/25341965                       #
+    ##############################################################
+    try:
+        parse(string, fuzzy=fuzzy)
+        return True
+    except ValueError:
+        return False
+
+
+def collect_files(path: str, extension='.jpg', delete_empty_folders=False):
+    """
+    Collect files from nested folders to a root one.
+    :param path: Path to search
+    :param extension: Files extension
+    :param delete_empty_folders: Delete empty folders
+    :return:
+    """
+    for dir_path, dir_names, files in os.walk(path):
+        for file in files:
+            if file.endswith(extension):
+                src = dir_path + '/' + file
+                dst = path + file
+                shutil.move(src, dst)
+    if delete_empty_folders:
+        deleting_empty_folders(path)
+
+
+def deleting_empty_folders(path):
+    """
+    Deleting all empty folder in the given path
+    :param path: Path, str
+    :return:
+    """
+    folders = list(os.walk(path))[1:]
+    for folder in folders:
+        if not folder[2]:
+            try:
+                os.rmdir(folder[0])
+            except OSError:
+                pass
+
+
 def get_screen_settings():
     """
     Get a monitor resolution
@@ -137,15 +181,13 @@ def remove_pattern(s: str, pattern: str = r"^\d+_\d+_") -> str:
     """
     Remove a specified pattern from the start of a given string.
 
-    The default pattern is set to remove leading integers in the format 'n_m_' from the string, where 'n' and 'm' are
-    integers. This pattern can be overridden by providing a different regular expression pattern.
+    The default pattern is set to remove leading integers in the format 'n_m_' from the string, where 'n' and 'm' are integers. This pattern can be overridden by providing a different regular expression pattern.
 
     :param s: The string from which to remove the pattern.
     :param pattern: The regular expression pattern to remove from the start of the string. Default is '^\d+_\d+_'.
     :type s: str
     :type pattern: str
-    :return: The modified string with the specified pattern removed if it was present at the start, otherwise
-    the original string.
+    :return: The modified string with the specified pattern removed if it was present at the start, otherwise the original string.
     :rtype: str
 
     Example:
@@ -176,11 +218,11 @@ def map_name(s: str) -> str:
     'TOCNF-Fe3+ Chem'
     """
     mapping = {
-        1: "Name 1",
-        2: "Name 2",
-        3: "Name 3",
-        4: "Name 4",
-        5: "Name 5"
+        1: "SFC-10",
+        2: "TOCNF-Fe3+ Chem",
+        3: "CNF-ROD",
+        4: "GDE-LignoCNF",
+        5: "TOCNF-Fe3+ Phys"
     }
 
     # Extract 'n' from the string

@@ -33,8 +33,31 @@ class RGBAndIVDataGatherer:
         :return: None
         """
         try:
-            # Add your sorter here
-            ...
+            current_keys = list(self.data.keys())
+            if "IEDT" in self.highest_path:
+                # Get naturally sorted keys
+                sorted_keys = natsorted(self.data.keys())
+
+                # Separate keys into even and odd indices
+                even_keys = [sorted_keys[i] for i in range(len(sorted_keys)) if i % 2 == 0]
+                odd_keys = [sorted_keys[i] for i in range(len(sorted_keys)) if i % 2 != 0]
+
+                # Concatenate even and odd keys for new order
+                new_order_keys = even_keys + odd_keys
+
+                # Reconstruct the dictionary based on new order
+                self.data = {k: self.data[k] for k in new_order_keys}
+
+            if 'Aralab' in self.highest_path:
+                # Separate keys into even and odd based on your conditions
+                even_keys = [key for key in current_keys if int(key.split(' ')[-1]) % 2 == 0]
+                odd_keys = [key for key in current_keys if int(key.split(' ')[-1]) % 2 != 0]
+
+                # Concatenate even and odd lists
+                sorted_keys = even_keys + odd_keys
+                # Reconstruct the dictionary based on sorted keys
+                self.data = {k: self.data[k] for k in sorted_keys}
+
         except Exception as e:
             print(f"An error occurred while sorting the data: {e}")
 
@@ -91,6 +114,59 @@ class RGBAndIVDataGatherer:
                             extension = os.path.splitext(newest_file)[1]
                             self.rgb_reading(newest_file, rgb_path, dir_name)
 
+    def data_gathering(self):
+        """
+        Generate a dictionary containing RGB data. Use data from the newest "Total_RGB.json" file
+        within the highest_path directory if available, otherwise gather data from individual directories.
+
+        :return: None
+        """
+        newest_total_rgb_file = get_newest_file_global(self.highest_path, "Total_RGB.json")
+
+        if newest_total_rgb_file:
+            with open(newest_total_rgb_file, 'r') as f:
+                total_rgb_data = json.load(f)
+
+            for dir_name, dir_data in total_rgb_data.items():
+                self.data[dir_name] = {"RGB_data": {}}
+                if self.settings['iv_to_color_map'] is not None:
+                    self.add_iv_data(dir_name)
+                specific_timeline = self.settings['Specific Timeline'].get(dir_name)
+                self.data[dir_name]['Timeline'] = TimeLineProcessor(self.highest_path,
+                                                                    specific_timeline).check_the_path()
+
+                self.data[dir_name]['RGB_data'] = dir_data
+
+        else:
+            for dir_path, dir_names, _ in os.walk(self.highest_path):
+                for dir_name in dir_names:
+                    rgb_path = os.path.join(dir_path, dir_name, "RGB_analyzing")
+                    if os.path.exists(rgb_path):
+                        self.data[dir_name] = {"RGB_data": {}}
+                        if self.settings['iv_to_color_map'] is not None:
+                            self.add_iv_data(dir_name)
+                        specific_timeline = self.settings['Specific Timeline'].get(dir_name)
+                        self.data[dir_name]['Timeline'] = TimeLineProcessor(self.highest_path,
+                                                                            specific_timeline).check_the_path()
+                        # newest_file = get_newest_file(rgb_path)
+                        # if newest_file:
+                        #     self.rgb_reading(newest_file, rgb_path, dir_name)
+                        # Find the newest file for each extension and prefer JSON over XLSX
+                        newest_file = get_newest_file(rgb_path, '.json') or get_newest_file(rgb_path, '.xlsx')
+                        if newest_file:
+                            extension = os.path.splitext(newest_file)[1]
+                            self.rgb_reading(newest_file, rgb_path, dir_name)
+
+    # def rgb_reading(self, current_file, path_to, dir_name):
+    #     final_path = os.path.join(path_to, current_file)
+    #     with open(final_path, 'r') as f:
+    #         json_data = json.load(f)
+    #     for pic_number, areas in json_data.items():
+    #         self.data[dir_name]["RGB_data"][str(pic_number)] = {}
+    #         for area, values in areas.items():
+    #             self.data[dir_name]["RGB_data"][str(pic_number)][area] = {"RGB": {}}
+    #             self.data[dir_name]["RGB_data"][str(pic_number)][area]["RGB"] = values["RGB"]
+
     def rgb_reading(self, current_file, path_to, dir_name):
         final_path = os.path.join(path_to, current_file)
         extension = os.path.splitext(current_file)[1]
@@ -102,14 +178,17 @@ class RGBAndIVDataGatherer:
                 self.data[dir_name]["RGB_data"][str(row_num)] = {}
                 area_count = 1
                 for i in range(1, 12, 4):
-                    self.data[dir_name]["RGB_data"][str(row_num)][f"Area {area_count}"] = {
-                        "RGB": {
-                            "R": row[i],
-                            "G": row[i + 1],
-                            "B": row[i + 2]
+                    try:
+                        self.data[dir_name]["RGB_data"][str(row_num)][f"Area {area_count}"] = {
+                            "RGB": {
+                                "R": row[i],
+                                "G": row[i + 1],
+                                "B": row[i + 2]
+                            }
                         }
-                    }
-                    area_count += 1
+                        area_count += 1
+                    except KeyError:
+                        continue
 
         elif extension == '.json':
             with open(final_path, 'r') as f:
@@ -125,7 +204,6 @@ class RGBAndIVDataGatherer:
         is_dict = isinstance(iv_map, dict)
         iv_data_dict = {}
 
-        mapped_name = None
         if is_dict:
             mapped_name = iv_map.get(dir_name)
 
@@ -148,6 +226,7 @@ class RGBAndIVDataGatherer:
                 iv_data_dict[next_key] = device_data
 
         # Add iv_data_dict to self.data under the key ['iv_data']
+
         self.data[dir_name]['iv_data'] = iv_data_dict
 
     def generate_iv_key_iterator(self):

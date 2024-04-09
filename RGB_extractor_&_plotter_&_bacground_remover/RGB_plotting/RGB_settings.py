@@ -3,15 +3,16 @@ SETTINGS = {
     'iv_json': False,
     'iv_to_color_map': None,  # This activates IV data processing
     'prediction_flag': 0,
-    'LAB_delta_flag': 1,
+    'LAB_delta_flag': 0,
+    'LAB_standard_deviation_compute': False,
     'Specific Timeline': {},
     'Table_tab': None,
     'samples_number': 1,
-    'num_of_points': 'all',
-    'min_possible_points_for_prediction': 3,
-    'prediction_start_point': 0,
+    'num_of_points': 'all',  # int for specific point or 'all' for all
+    'min_possible_points_for_prediction': 3,  # <- just a threshold to program to execute properly
+    'prediction_start_point': 1,  # 0 <- which point to EXCLUDE then doing prediction modeling
     'concatenate_number': 15,
-    'initial_predicted_current_avg_time_range_start': 100,
+    'initial_predicted_current_avg_time_range_start': 100,  # 50
     'sweep_key': 'Average',
     'chart_x_scale': 0.8,  # 480 pixels
     'chart_y_scale': 0.85,  # 288 pixels
@@ -21,14 +22,16 @@ SETTINGS = {
         'Average RGB': 2,
         'STDEV': 6,
         'Initial vs final': 10,
-        'LAB': 15,
-        'LAB delta': 19,
-        'CMYK': 23,
-        'HSL': 28,
-        'HSV': 32,
-        'Color Difference': 36,
-        'IV data': 46,
-        'Yellow': 56,
+        'RGB_Euclidian': 15,
+        'LAB': 19,
+        'LAB_std_dev': 23,
+        'LAB delta': 27,
+        'CMYK': 31,
+        'HSL': 36,
+        'HSV': 40,
+        'Color Difference': 44,
+        'IV data': 54,
+        'Yellow': 64,
         'Prediction': 0,
     },
     'ChartsCreator': {

@@ -298,7 +298,8 @@ class ColorChartsCreator:
         chart.set_plotarea({'border': {'none': True},
                             'layout': {'x': 0.8, 'y': 0.15, 'width': 0.8, 'height': 0.7}})
         chart.set_chartarea({'border': {'none': True}})
-        chart.set_size({'x_scale': self.settings['rgb_column_chart_x_scale'], 'y_scale': self.settings['rgb_column_chart_y_scale']})
+        chart.set_size({'x_scale': self.settings['rgb_column_chart_x_scale'],
+                        'y_scale': self.settings['rgb_column_chart_y_scale']})
 
         return chart
 
@@ -314,7 +315,19 @@ class ColorChartsCreator:
         chart = self.wb.add_chart({'type': 'scatter'})
         components = [('L*', 'black'), ('a*', 'orange'), ('b*', 'purple')]
         column = self.high_settings['Starting columns']['LAB']
+
         for i, (component, color) in enumerate(components):
+            y_error_bars = {}
+            if self.high_settings['LAB_standard_deviation_compute']:
+                stdev_col_letter = row_to_excel_col(self.high_settings['Starting columns']['LAB_std_dev'] + i + 1)
+                y_error_bars = {
+                    'type': self.settings['error_bar_type'],
+                    'plus_values': f"='{device_name}'!${stdev_col_letter}${data_start + 1}:"
+                                   f"${stdev_col_letter}${data_end + 1}",
+                    'minus_values': f"='{device_name}'!${stdev_col_letter}${data_start + 1}:"
+                                    f"${stdev_col_letter}${data_end + 1}",
+                    'line': {'color': color}
+                }
             chart.add_series({
                 'name': [f'{device_name}', data_start - 1, i + column],
                 'categories': [f'{device_name}', data_start, 0, data_end, 0],
@@ -328,6 +341,7 @@ class ColorChartsCreator:
                              'transparency': self.settings['rgb_plot']['marker']['transparency'].get(i, 0)},
                     # Default to 0 if not specified
                 },
+                'y_error_bars': y_error_bars,
             })
         chart.set_title({'name': f"{device_name} CIELAB ΔE*",
                          'name_font': {'size': self.settings['title_font_size'], 'italic': False, 'bold': False,
@@ -374,9 +388,12 @@ class ColorChartsCreator:
         :return: The scatter chart object
         """
         chart = self.wb.add_chart({'type': 'scatter'})
+        # Wrapp a setting's key-value around this:
         components = [('L*', 'black'), ('a*', 'orange'), ('b*', 'purple')]
         # components = [('L*', 'black')] #, ('a*', 'orange'), ('b*', 'purple')]
+        # components = [('a*', 'orange')] #, ('b*', 'purple')]
         column = self.high_settings['Starting columns']['LAB delta']
+
         for i, (component, color) in enumerate(components):
             chart.add_series({
                 'name': [f'{device_name}', data_start - 1, i + column],

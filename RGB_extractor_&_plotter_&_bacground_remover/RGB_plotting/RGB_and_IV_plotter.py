@@ -1,26 +1,31 @@
+from __future__ import annotations
+
 import math
 import os
 import time
 from collections import defaultdict
 from datetime import date
+from typing import Optional, Dict
 
+import colour
+import numpy as np
 import pandas as pd
 import xlsxwriter
-import colour
-from icecream import ic
 from natsort import natsorted
 from tqdm import tqdm
+from xlsxwriter.workbook import ChartScatter
 from xlsxwriter.worksheet import Worksheet
 
 from Charts_creator import ColorChartsCreator
 from Color_spaces_convertion import (rgb_to_cmyk, rgb_to_hsl, rgb_to_hsv, rgb_to_lab)
+from Custom_errors import ColorTemperatureIsMissing
 from IV_data_plots_creator import IVPlotsCreator
-# from IV_prediction import YellowChannelPredictor <- coming soon
+from IV_prediction import YellowChannelPredictor
 from Instruments import (random_color, open_file, row_to_excel_col, remove_pattern, map_name)
 from RGB_and_IV_gatherer import RGBAndIVDataGatherer
 from RGB_settings import *
 from RGB_settings_update import UpdateSettings
-from Custom_errors import ColorTemperatureIsMissing
+from Standard_deviation_of_color_difference import StandardDeviationForEuclidianDistance
 
 
 class RGBandIVplotter:
@@ -46,7 +51,7 @@ class RGBandIVplotter:
             (480 * self.settings['all_in_one_chart_x_scale']) / 64) + 1
         self.chart_huge_vertical_spacing = math.ceil(
             (288 * self.settings['all_in_one_chart_y_scale']) / 20) + 1
-
+        self.illuminant = colour.temperature.CCT_to_xy_CIE_D(self.settings['color_temperature'])
         self.row_first_plot = 0
         self.workbook = self.create_workbook()
         self.center = self.workbook.add_format({'align': 'center'})
@@ -72,7 +77,6 @@ class RGBandIVplotter:
                                 'CMC acceptability', 'CMC imperceptibility', 'DIN99', 'DIN99 Textile']
         self.iv_map_dict = {short: full for short, full in zip(self.iv_headers_short, self.settings['iv_full_headers'])}
         self.data = RGBAndIVDataGatherer(highest_path=self.highest_path, settings=self.settings).data_generate()
-
         self.all_samples_list = list(self.data.keys())
         self.samples_number_per_row = self.settings['samples_number']
         if self.samples_number_per_row >= len(self.all_samples_list):
@@ -239,17 +243,25 @@ class RGBandIVplotter:
         :param device_name: The name of the device for which the sheet is being created.
         :return: None
         """
-
+        # Calculate average RGB and write CMYK, HSL, and HSV values
+        (avg_rgb_per_time_point, standard_deviation_rgb_per_time_point, avg_lab_per_time_point,
+         standard_deviation_lab_per_time_point, standard_deviation_new_rgb, standard_deviation_new_lab) \
+            = self.get_average_rgb_values_per_time_point(device_name)
+        initial_row = self.timeline_len + 6
+        final_row = self.timeline_len * 2 + 5
         # Get starting columns from settings
         col_avg_rgb = self.settings['Starting columns']['Average RGB']
         col_stdev = self.settings['Starting columns']['STDEV']
         col_initial_vs_final = self.settings['Starting columns']['Initial vs final']
+        col_rgb_euclid = self.settings['Starting columns']['RGB_Euclidian']
         col_cmyk = self.settings['Starting columns']['CMYK']
         col_hsl = self.settings['Starting columns']['HSL']
         col_hsv = self.settings['Starting columns']['HSV']
         col_lab = self.settings['Starting columns']['LAB']
+        col_lab_std_dev = self.settings['Starting columns']['LAB_std_dev']
         col_lab_delta = self.settings['Starting columns']['LAB delta']
         col_yellow = self.settings['Starting columns']['Yellow']
+        col_iv_data = self.settings['Starting columns']['IV data']
 
         self.write_center_across_selection(ws, (self.timeline_len + 3, col_avg_rgb), 'Average')
         self.write_center_across_selection(ws, (self.timeline_len + 3, col_stdev),
@@ -261,8 +273,23 @@ class RGBandIVplotter:
         ws.write(self.timeline_len + 6, col_initial_vs_final, 'Final', self.center)
         self.write_center_across_selection(ws, (self.timeline_len + 7, col_initial_vs_final),
                                            'Color difference initial vs final', 2)
-        ws.write(self.timeline_len + 7, col_initial_vs_final + 2, 'L*', self.center)
-        ws.write(self.timeline_len + 7, col_initial_vs_final + 3, 'Color Temperature', self.center)
+        ws.write(self.timeline_len + 7, col_initial_vs_final + 1, 'RGB', self.center)
+        ws.write(self.timeline_len + 7, col_initial_vs_final + 2, 'CIELAB', self.center)
+        ws.write(self.timeline_len + 8, col_initial_vs_final, 'Value', self.center)
+        ws.write(self.timeline_len + 9, col_initial_vs_final, 'Direct Standard Deviation Propagation', self.center)
+        ws.write(self.timeline_len + 10, col_initial_vs_final, 'Partial Derivative Method', self.center)
+        ws.write(self.timeline_len + 11, col_initial_vs_final, 'Monte Carlo Simulation', self.center)
+        ws.write(self.timeline_len + 12, col_initial_vs_final, 'Distance STDEV.S', self.center)
+
+        # check this "if" below
+        if self.settings['LAB_standard_deviation_compute']:
+            ws.write(self.timeline_len + 13, col_initial_vs_final, 'Standard deviation difference', self.center)
+            col = row_to_excel_col(col_lab_std_dev + 1)
+            ws.write_formula(self.timeline_len + 13, col_initial_vs_final + 2,
+                             f'=SQRT({col}{initial_row}^2+{col}{final_row}^2)')
+        ws.write(self.timeline_len + 7, col_initial_vs_final + 3, 'L*', self.center)
+        ws.write(self.timeline_len + 9, col_initial_vs_final + 3, 'Color Temperature', self.center)
+        ws.write(self.timeline_len + 11, col_initial_vs_final + 3, 'Jsc difference', self.center)
 
         # 'Average RGB' headers
         ws.write(self.timeline_len + 4, col_avg_rgb, 'R', self.center)
@@ -294,9 +321,6 @@ class RGBandIVplotter:
                 ws.write_formula(self.timeline_len + 5 + data_point, col_stdev + color_offset, stdev_formula)
 
         # Writing initial and final average RGB values
-        initial_row = self.timeline_len + 6
-        final_row = self.timeline_len * 2 + 5
-
         # Initial average RGB
         ws.write(self.timeline_len + 5, col_initial_vs_final + 1, f'=C{initial_row}', self.center)
         ws.write(self.timeline_len + 5, col_initial_vs_final + 2, f'=D{initial_row}', self.center)
@@ -307,21 +331,56 @@ class RGBandIVplotter:
         ws.write(self.timeline_len + 6, col_initial_vs_final + 2, f'=D{final_row}', self.center)
         ws.write(self.timeline_len + 6, col_initial_vs_final + 3, f'=E{final_row}', self.center)
 
-        # Writing the color difference formula
+        # Writing the RGB color difference formula
         formula = (f'=SQRT((C${final_row} - C${initial_row})^2 + (D${final_row} - D${initial_row})^2 +'
                    f' (E${final_row} - E${initial_row})^2)')
         ws.write_formula(self.timeline_len + 8, col_initial_vs_final + 1, formula)
 
+        # Writing the LAB color difference formula
+        formula_lab = (
+            f'=SQRT(({row_to_excel_col(col_lab + 1)}${final_row} - {row_to_excel_col(col_lab + 1)}${initial_row})^2 +'
+            f' ({row_to_excel_col(col_lab + 2)}${final_row} - {row_to_excel_col(col_lab + 2)}${initial_row})^2 +'
+            f' ({row_to_excel_col(col_lab + 3)}${final_row} - {row_to_excel_col(col_lab + 3)}${initial_row})^2)')
+        ws.write_formula(self.timeline_len + 8, col_initial_vs_final + 2, formula_lab)
+
+        # Calculate and write deviations for RGB
+        deviations_rgb = StandardDeviationForEuclidianDistance(avg_rgb_per_time_point,
+                                                               standard_deviation_rgb_per_time_point)
+        # Write Weight differences
+        ws.write(self.timeline_len + 9, col_initial_vs_final + 1,
+                 deviations_rgb.direct_standard_deviation_propagation())
+        # Write Error propagation
+        ws.write(self.timeline_len + 10, col_initial_vs_final + 1, deviations_rgb.partial_derivative_method())
+        # Write Monte Carlo
+        ws.write(self.timeline_len + 11, col_initial_vs_final + 1, deviations_rgb.monte_carlo_simulation())
+
+        ws.write(self.timeline_len + 12, col_initial_vs_final + 1, standard_deviation_new_rgb, self.center)
+        # Calculate and write deviations for LAB
+        deviations_lab = StandardDeviationForEuclidianDistance(avg_lab_per_time_point,
+                                                               standard_deviation_lab_per_time_point)
+        # Write Weight differences
+        ws.write(self.timeline_len + 9, col_initial_vs_final + 2,
+                 deviations_lab.direct_standard_deviation_propagation())
+        # Write Error propagation
+        ws.write(self.timeline_len + 10, col_initial_vs_final + 2, deviations_lab.partial_derivative_method())
+        # Write Monte Carlo
+        ws.write(self.timeline_len + 11, col_initial_vs_final + 2, deviations_lab.monte_carlo_simulation())
+        ws.write(self.timeline_len + 12, col_initial_vs_final + 2, standard_deviation_new_lab, self.center)
         # Writing L* differences (0 - black, 100 - white). Final - initial. Positive - lightening, negative - darkening
         formula_lstar = f"={row_to_excel_col(col_lab + 1)}{final_row}-{row_to_excel_col(col_lab + 1)}{initial_row}"
-        ws.write_formula(self.timeline_len + 8, col_initial_vs_final + 2, formula_lstar)
+        ws.write_formula(self.timeline_len + 8, col_initial_vs_final + 3, formula_lstar)
 
         # Calculate illuminant and write down the color temperature
         if self.settings['color_temperature'] is None:
             raise ColorTemperatureIsMissing(f"\nColor temperature is missing")
-        illuminant = colour.temperature.CCT_to_xy_CIE_D(self.settings['color_temperature'])
-        ws.write(self.timeline_len + 8, col_initial_vs_final + 3, self.settings['color_temperature'])
 
+        ws.write(self.timeline_len + 10, col_initial_vs_final + 3, self.settings['color_temperature'])
+
+        if self.iv_flag and self.data[device_name].get('iv_data'):
+            ws.write(self.timeline_len + 12, col_initial_vs_final + 3,
+                     f"=(({row_to_excel_col(col_iv_data + 2)}{final_row}"
+                     f"-{row_to_excel_col(col_iv_data + 2)}{initial_row})/"
+                     f"{row_to_excel_col(col_iv_data + 2)}{initial_row})*100")
         # # Write CIE76 Color difference (similar to Euclidian color difference)
         # formula_cie76 = (f'=SQRT(({row_to_excel_col(col_lab + 1)}${final_row} -'
         #                  f' {row_to_excel_col(col_lab + 1)}${initial_row})^2 +'
@@ -331,6 +390,10 @@ class RGBandIVplotter:
         #                  f' {row_to_excel_col(col_lab + 3)}${initial_row})^2)')
         # ws.write_formula(self.timeline_len + 8, col_initial_vs_final + 3, formula_cie76)
 
+        # Write headers for RGB_Euclidian
+        self.write_center_across_selection(ws, (self.timeline_len + 3, col_rgb_euclid), 'RGB Euclidian')
+        ws.write(self.timeline_len + 4, col_rgb_euclid, 'Color difference (n and n-1)', self.center)
+        ws.write(self.timeline_len + 4, col_rgb_euclid + 1, 'Euclidian Norm (SRSS)', self.center)
         # Write headers for CMYK
         self.write_center_across_selection(ws, (self.timeline_len + 3, col_cmyk), 'CMYK', 4)
         ws.write(self.timeline_len + 4, col_cmyk, 'C', self.center)
@@ -356,16 +419,23 @@ class RGBandIVplotter:
         ws.write(self.timeline_len + 4, col_lab + 1, 'a*', self.center)
         ws.write(self.timeline_len + 4, col_lab + 2, 'b*', self.center)
 
+        # Write headers for CIELAB ΔE* standard deviation
+        self.write_center_across_selection(ws, (self.timeline_len + 3, col_lab_std_dev),
+                                           'CIELAB ΔE* standard deviation')
+        ws.write(self.timeline_len + 4, col_lab_std_dev, 'L*', self.center)
+        ws.write(self.timeline_len + 4, col_lab_std_dev + 1, 'a*', self.center)
+        ws.write(self.timeline_len + 4, col_lab_std_dev + 2, 'b*', self.center)
+
         # Write headers for CIELAB ΔE* delta
         self.write_center_across_selection(ws, (self.timeline_len + 3, col_lab_delta), 'CIELAB ΔE* delta')
         ws.write(self.timeline_len + 4, col_lab_delta, 'L*', self.center)
         ws.write(self.timeline_len + 4, col_lab_delta + 1, 'a*', self.center)
         ws.write(self.timeline_len + 4, col_lab_delta + 2, 'b*', self.center)
 
-        # Calculate average RGB and write CMYK, HSL, and HSV values
-        avg_rgb_per_time_point = self.get_average_rgb_values_per_time_point(device_name)
-        lab_values = []
-        for idx, (avg_r, avg_g, avg_b, avg_y) in enumerate(avg_rgb_per_time_point):
+        for idx, (colors, deviations_rgb, avg_lab, lab_std_dev) in enumerate(
+                zip(avg_rgb_per_time_point, standard_deviation_rgb_per_time_point, avg_lab_per_time_point,
+                    standard_deviation_lab_per_time_point)):
+            avg_r, avg_g, avg_b, avg_y = colors
             row_to_write = self.timeline_len + 5 + idx
 
             # Convert average RGB to CMYK, HSL, and HSV
@@ -373,8 +443,7 @@ class RGBandIVplotter:
             avg_hsl = rgb_to_hsl(avg_r, avg_g, avg_b)
             avg_hsv = rgb_to_hsv(avg_r, avg_g, avg_b)
 
-            avg_lab = rgb_to_lab(r=avg_r, g=avg_g, b=avg_b, illuminant=illuminant)
-            lab_values.append(avg_lab)
+            ws.write_row(row_to_write, col_lab_std_dev, lab_std_dev, self.center)
 
             # Write these values into the worksheet
             ws.write_row(row_to_write, col_cmyk, avg_cmyk, self.center)
@@ -382,6 +451,21 @@ class RGBandIVplotter:
             ws.write_row(row_to_write, col_hsv, avg_hsv, self.center)
             ws.write_row(row_to_write, col_lab, avg_lab, self.center)
 
+            # Write RGB_Euclidian calculations
+            if idx != 0:
+                ws.write_formula(row_to_write, col_rgb_euclid,
+                                 f"=SQRT("
+                                 f"({row_to_excel_col(col_avg_rgb + 1)}{row_to_write}"
+                                 f" - {row_to_excel_col(col_avg_rgb + 1)}{row_to_write + 1})^2 +"
+                                 f"({row_to_excel_col(col_avg_rgb + 2)}{row_to_write}"
+                                 f" - {row_to_excel_col(col_avg_rgb + 2)}{row_to_write + 1})^2 +"
+                                 f"({row_to_excel_col(col_avg_rgb + 3)}{row_to_write}"
+                                 f" - {row_to_excel_col(col_avg_rgb + 3)}{row_to_write + 1})^2"
+                                 f")")
+            ws.write_formula(row_to_write, col_rgb_euclid + 1,
+                             f"=SQRT({row_to_excel_col(col_avg_rgb + 1)}{row_to_write + 1}^2 +"
+                             f"{row_to_excel_col(col_avg_rgb + 2)}{row_to_write + 1}^2 +"
+                             f"{row_to_excel_col(col_avg_rgb + 3)}{row_to_write + 1}^2)")
             for lab in range(3):
                 cell_lab = row_to_excel_col(col_lab + lab + 1)
                 previous_row = row_to_write + 1 if idx == 0 else row_to_write
@@ -402,7 +486,7 @@ class RGBandIVplotter:
             # Write average RGB values calculated by python for debugging
             # ws.write_row(row_to_write, 50, [avg_r, avg_g, avg_b])
 
-        lab_df = pd.DataFrame(lab_values, columns=['L*', 'a*', 'b*'])
+        lab_df = pd.DataFrame(avg_lab_per_time_point, columns=['L*', 'a*', 'b*'])
         self.data[device_name]['CIELAB_df'] = lab_df
         self.cielab_color_difference(ws=ws, device_name=device_name)
 
@@ -473,44 +557,110 @@ class RGBandIVplotter:
         for i, delta_e in enumerate(color_differences):
             ws.write(self.timeline_len + 5, col_color_dif + i, delta_e)
 
-    def get_average_rgb_values_per_time_point(self, device_name: str) -> list:
+    def get_average_rgb_values_per_time_point(self, device_name: str) -> \
+            tuple[
+                list[tuple[float, ...]],
+                list[tuple[float, ...]],
+                list[tuple[float, ...]],
+                list[tuple[float, ...]],
+                float,
+                float]:
         """
-        Calculate the average R, G, B values per time point from the data dictionary.
+        Calculate the average R, G, B, and LAB values per time point from the data dictionary,
+        as well as their standard deviations.
 
         :param device_name: The name of the device for which the sheet is being created.
-        :return: A list of tuples containing the average R, G, B values for each time point.
+        :return: A tuple containing lists of tuples with the average R, G, B, LAB values,
+                 their standard deviations, and average LAB values for each time point.
         """
         sum_rgb = defaultdict(lambda: [0, 0, 0])
+        sum_squares_rgb = defaultdict(lambda: [0, 0, 0])
         count_rgb = defaultdict(int)
 
+        # Convert RGB to LAB and accumulate for each time point
+        sum_lab = defaultdict(lambda: [0, 0, 0])
+        sum_squares_lab = defaultdict(lambda: [0, 0, 0])
+        set_initial_rgb, set_final_rgb = [], []
+        set_initial_lab, set_final_lab = [], []
         # Sort the keys
         sorted_keys = natsorted(self.data[device_name]['RGB_data'].keys())
         # Create a new dictionary with sorted keys
         sorted_dict = {k: self.data[device_name]['RGB_data'][k] for k in sorted_keys}
         for time_point_str, area_data in sorted_dict.items():
+            # if time_point_str == '0' or time_point_str == f'{self.timeline_len - 1}':
+            #     ic(time_point_str, area_data)
             for area_value in area_data.values():
                 rgb_value = area_value.get('RGB')
                 if rgb_value and all(v is not None for v in rgb_value.values()):
-                    sum_rgb[time_point_str][0] += rgb_value['R']
-                    sum_rgb[time_point_str][1] += rgb_value['G']
-                    sum_rgb[time_point_str][2] += rgb_value['B']
+                    r, g, b = rgb_value['R'], rgb_value['G'], rgb_value['B']
+                    sum_rgb[time_point_str][0] += r
+                    sum_rgb[time_point_str][1] += g
+                    sum_rgb[time_point_str][2] += b
+                    sum_squares_rgb[time_point_str][0] += r ** 2
+                    sum_squares_rgb[time_point_str][1] += g ** 2
+                    sum_squares_rgb[time_point_str][2] += b ** 2
                     count_rgb[time_point_str] += 1
 
-        avg_rgb_per_time_point = []
-        avg_yellow_per_time_point = []
-        for time_point_str, (total_r, total_g, total_b) in sum_rgb.items():
+                    # Convert RGB to LAB
+                    l, a, b_ = rgb_to_lab(r, g, b, illuminant=self.illuminant)
+                    sum_lab[time_point_str][0] += l
+                    sum_lab[time_point_str][1] += a
+                    sum_lab[time_point_str][2] += b_
+                    sum_squares_lab[time_point_str][0] += l ** 2
+                    sum_squares_lab[time_point_str][1] += a ** 2
+                    sum_squares_lab[time_point_str][2] += b_ ** 2
+                    # Add to initial and final sets based on condition
+                    if time_point_str == '0':
+                        set_initial_rgb.append([r, g, b])
+                        set_initial_lab.append([l, a, b_])
+                    elif time_point_str == f'{self.timeline_len - 1}':
+                        set_final_rgb.append([r, g, b])
+                        set_final_lab.append([l, a, b_])
+        # Calculate the Euclidian distance and standard deviation using new approach
+        distances_new_rgb = np.linalg.norm(np.array(set_final_rgb) - np.array(set_initial_rgb), axis=1)
+        distances_new_lab = np.linalg.norm(np.array(set_final_lab) - np.array(set_initial_lab), axis=1)
+        # avg_distance_new_rgb = np.mean(distances_new_rgb)
+        # avg_distance_new_lab = np.mean(distances_new_lab)
+        std_distance_new_rgb = np.std(distances_new_rgb, ddof=1)
+        std_distance_new_lab = np.std(distances_new_lab, ddof=1)
+
+        avg_rgb_per_time_point, avg_lab_per_time_point = [], []
+        standard_deviation_rgb, standard_deviation_lab = [], []
+
+        for time_point_str, _ in sum_rgb.items():
             count = count_rgb[time_point_str]
-            avg_r, avg_g, avg_b = total_r / count, total_g / count, total_b / count
-            avg_y = 255 - avg_b  # Calculate Yellow
-            avg_rgb_per_time_point.append((avg_r, avg_g, avg_b, avg_y))
-            avg_yellow_per_time_point.append(avg_y)
+
+            # Average RGB and Yellow calculation
+            avg_r, avg_g, avg_b = [sum_rgb[time_point_str][i] / count for i in range(3)]
+            avg_rgb_per_time_point.append((avg_r, avg_g, avg_b, 255 - avg_b))
+
+            # Average LAB calculation
+            avg_l, avg_a, avg_b = [sum_lab[time_point_str][i] / count for i in range(3)]
+            avg_lab_per_time_point.append((avg_l, avg_a, avg_b))
+
+            if count > 1:
+                stdev_rgb = [math.sqrt((sum_squares_rgb[time_point_str][i] -
+                                        sum_rgb[time_point_str][i] ** 2 / count) / (count - 1)) for i in range(3)]
+
+                stdev_lab = [math.sqrt((sum_squares_lab[time_point_str][i] -
+                                        sum_lab[time_point_str][i] ** 2 / count) / (count - 1)) for i in range(3)]
+            else:
+                stdev_rgb = [0.0, 0.0, 0.0]
+                stdev_lab = [0.0, 0.0, 0.0]
+            standard_deviation_rgb.append(tuple(stdev_rgb))
+            standard_deviation_lab.append(tuple(stdev_lab))
 
         self.data[device_name]['Average_RGB'] = avg_rgb_per_time_point
-        # Create a DataFrame for Yellow and store it
-        yellow_df = pd.DataFrame(avg_yellow_per_time_point, columns=['Average_Yellow'])
-        self.data[device_name]['Yellow_df'] = yellow_df
+        self.data[device_name]['Average_LAB'] = avg_lab_per_time_point
 
-        return avg_rgb_per_time_point
+        # Create DataFrames for Yellow and LAB values and store them
+        yellow_df = pd.DataFrame([y for _, _, _, y in avg_rgb_per_time_point], columns=['Average_Yellow'])
+        lab_df = pd.DataFrame(avg_lab_per_time_point, columns=['L*', 'a*', 'b*'])
+        self.data[device_name]['Yellow_df'] = yellow_df
+        self.data[device_name]['LAB_df'] = lab_df
+
+        return (avg_rgb_per_time_point, standard_deviation_rgb, avg_lab_per_time_point, standard_deviation_lab,
+                std_distance_new_rgb, std_distance_new_lab)
 
     def write_iv_data(self, ws: Worksheet, data: dict) -> None:
         """
@@ -575,8 +725,8 @@ class RGBandIVplotter:
                                                                 data_start=self.timeline_len + 5,
                                                                 data_end=self.timeline_len * 2 + 4)
         lab_change_chart_copy = self.plotter.lab_delta_scatter_chart(device_name=device_name,
-                                                                data_start=self.timeline_len + 5,
-                                                                data_end=self.timeline_len * 2 + 4)
+                                                                     data_start=self.timeline_len + 5,
+                                                                     data_end=self.timeline_len * 2 + 4)
         self.lab_charts_copy[device_name] = lab_change_chart_copy
         ws.insert_chart(self.row_first_plot + self.chart_vertical_spacing * 2, self.chart_horizontal_spacing * 5,
                         lab_change_chart)
@@ -716,7 +866,7 @@ class RGBandIVplotter:
         :param row: Row number.
         :param col_start: Starting column number.
         """
-        device = self.iv_prediction_chart_copies.get(device_name, None)
+        device: Optional[Dict[int, ChartScatter]] = self.iv_prediction_chart_copies.get(device_name, None)
         if device is None:
             return
         for num_of_points in range(self.prediction_start, self.prediction_end):
@@ -734,7 +884,7 @@ class RGBandIVplotter:
         :param col_start: Starting column number.
         :return: Next available column after inserting charts.
         """
-        device = self.iv_chart_details.get(device_name, None)
+        device: Optional[Dict[int, ChartScatter]] = self.iv_chart_details.get(device_name, None)
         if device is None:
             return
         for i, _ in enumerate(self.iv_map_dict.keys()):
@@ -824,7 +974,7 @@ class RGBandIVplotter:
         # Populate values
         cell_rgb_euclidian = (f"{row_to_excel_col(self.settings['Starting columns']['Initial vs final'] + 2)}"
                               f"{len(self.data[device_name]['Timeline']) + 9}")
-        cell_lstar = (f"{row_to_excel_col(self.settings['Starting columns']['Initial vs final'] + 3)}"
+        cell_lstar = (f"{row_to_excel_col(self.settings['Starting columns']['Initial vs final'] + 4)}"
                       f"{len(self.data[device_name]['Timeline']) + 9}")
         if row == 0:
             for device_name_to_cell in range(len(self.delta_e_headers) + 2):
