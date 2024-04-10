@@ -15,7 +15,6 @@ class UpdateSettings:
         self.settings['ChartsCreator']['major_unit'] = self.settings['ChartsCreator']['max_time'] // 4
         self.settings['ChartsCreator']['minor_unit'] = self.settings['ChartsCreator']['major_unit'] / 2
 
-
         if 'IEDT' in self.highest_path:
             self.settings['color_temperature'] = 3350
             self.settings['LAB_delta_flag'] = 1

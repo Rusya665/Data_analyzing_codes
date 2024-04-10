@@ -365,6 +365,6 @@ class RemoveBackgroundMakeFilm:
 
 if __name__ == '__main__':
     start_time = time.time()
-    path_to = "path/to/your/folder"
-    RemoveBackgroundMakeFilm(path_to, cycles=1, open_logs=True)
+    path_to = r'C:\Users\runiza_admin\OneDrive - O365 Turun yliopisto\Desktop\new_aging_blah_blah/'
+    RemoveBackgroundMakeFilm(path_to, cycles=3, open_logs=True)
     print("\n", "--- %s seconds ---" % (time.time() - start_time))
